@@ -71,6 +71,7 @@
 </template>
 
 <script>
+import CryptoJS from 'crypto-js'
 export default {
   layout: 'blank',
   data(){
@@ -111,10 +112,68 @@ export default {
   },
   methods: {
     sendMsg(){
-
+      const _self = this
+      let namePass
+      let emailPass
+      if(_self.timerid){
+        return false
+      }
+      this.$refs["ruleForm"].validateField('name', (valid) => {
+        namePass = valid
+      })
+      _self.statusMsg = ''
+      if(namePass){
+        return false
+      }
+      this.$refs["ruleForm"].validateField('email', (valid) => {
+        emailPass = valid
+      })
+      if(!namePass && !emailPass){
+        _self.$axios.post('/users/verify', {
+          username:encodeURIComponent(_self.ruleForm.name),
+          email: _self.ruleForm.email
+        }).then(({ status, data }) => {
+          if(status === 200 && data && data.code === 0) {
+            let count = 60;
+            _self.statusMsg = `验证码已发送,剩余${count--}秒`
+            _self.timerid = setInterval(function(){
+              _self.statusMsg = `验证码已发送,剩余${count--}秒`
+              if(count === 0){
+                clearInterval(_self.timerid)
+              }
+            }, 1000)
+          }else{
+            _self.statusMsg = data.msg
+          }
+        })
+      }
     },
     register(){
+      let _self = this
+      this.$refs['ruleForm'].validate((valid) => {
+        if(valid){
+          _self.$axios.post('/user/signup',{
+            username: window.encodeURIComponent(_self.ruleForm.name),
+            password: CryptoJS.MD5(_self.ruleForm.pwd).toSrting(),
+            email: _self.ruleForm.email,
+            code: _self.ruleForm.code
+          }).then(({status, data})=>{
+            if(status == 200){
+              if(data && data.code === 0){
+                location.href = '/login'
+              }else{
+                _self.error = data.msg
+              }
+            }else{
+              _self.error = `服务器出错,错误码：${status}`
+            }
 
+            setTimeout(()=>{
+              _self.error = ''
+            }, 3000)
+          })
+        }
+      })
     }
   }
 }
